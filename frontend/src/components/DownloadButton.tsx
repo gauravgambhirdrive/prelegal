@@ -15,18 +15,36 @@ export default function DownloadButton({ previewRef }: DownloadButtonProps) {
 
     setLoading(true);
     try {
-      const html2pdf = (await import("html2pdf.js")).default;
-      await html2pdf()
-        .set({
-          margin: [10, 10, 10, 10],
-          filename: "Mutual-NDA.pdf",
-          image: { type: "jpeg", quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true },
-          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-        })
-        .from(element)
-        .save();
-    } catch {
+      const html2canvas = (await import("html2canvas")).default;
+      const { jsPDF } = await import("jspdf");
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+
+      const imgData = canvas.toDataURL("image/jpeg", 0.98);
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 10;
+      const contentWidth = pageWidth - margin * 2;
+      const contentHeight = (canvas.height * contentWidth) / canvas.width;
+
+      let yOffset = 0;
+      const usableHeight = pageHeight - margin * 2;
+
+      while (yOffset < contentHeight) {
+        if (yOffset > 0) pdf.addPage();
+        pdf.addImage(imgData, "JPEG", margin, margin - yOffset, contentWidth, contentHeight);
+        yOffset += usableHeight;
+      }
+
+      pdf.save("Mutual-NDA.pdf");
+    } catch (err) {
+      console.error("PDF generation failed:", err);
       alert("Failed to generate PDF. Please try again.");
     } finally {
       setLoading(false);
